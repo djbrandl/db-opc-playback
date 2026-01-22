@@ -119,6 +119,14 @@ In the left sidebar "Playback Control" panel:
 
 ---
 
+## 🛠️ Companion Tools
+
+To quickly verify and visualize your playback data, we recommend using the **[Plain OPC UA Client](https://github.com/djbrandl/plain-opc-client)**. 
+
+It is a lightweight, no-frills client designed specifically as an ease-of-setup validation tool for the data exposed by this repository.
+
+---
+
 ## ❓ Troubleshooting
 
 *   **"SASL: SCRAM-SERVER-FIRST-MESSAGE..." Error:**
