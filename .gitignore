@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# OS Generated
+.DS_Store
+Thumbs.db

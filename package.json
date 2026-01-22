@@ -1,0 +1,25 @@
+{
+  "name": "db-opc-playback",
+  "version": "1.0.0",
+  "description": "Replay SQL database query results as OPC UA tags in real-time.",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "body-parser": "^2.2.2",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "knex": "^3.1.0",
+    "mssql": "^12.2.0",
+    "mysql2": "^3.16.1",
+    "node-opcua": "^2.161.0",
+    "pg": "^8.17.2",
+    "pg-query-stream": "^4.11.2",
+    "socket.io": "^4.8.3"
+  }
+}

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DB-OPC Playback</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        app: '#121212',       // Main background (very dark)
+                        panel: '#1e1e1e',     // Sidebar/Panel background
+                        header: '#252526',    // Panel headers
+                        border: '#333333',    // Subtle borders
+                        input: '#2b2b2b',     // Input background
+                        
+                        // Accents from image
+                        accent: '#4fc3f7',    // Cyan (Variables/Links)
+                        value: '#ffb74d',     // Orange (Values)
+                        good: '#66bb6a',      // Green (Status Good)
+                        bad: '#ef5350',       // Red (Stop/Disconnect)
+                        
+                        text: {
+                            main: '#e0e0e0',
+                            dim: '#9e9e9e',
+                            header: '#bbbbbb'
+                        }
+                    },
+                    fontSize: {
+                        'xxs': '0.65rem',
+                    },
+                    fontFamily: {
+                        sans: ['Segoe UI', 'Inter', 'sans-serif'],
+                        mono: ['Consolas', 'Menlo', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #121212; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        body { background-color: #121212; color: #e0e0e0; }
+
+        /* Inputs */
+        input, select, textarea {
+            background-color: #2b2b2b !important;
+            border: 1px solid #333 !important;
+            color: #e0e0e0 !important;
+            padding: 0.4rem 0.6rem !important;
+            border-radius: 2px;
+            font-size: 0.8rem;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: #4fc3f7 !important; /* Cyan focus */
+            outline: none;
+        }
+        input:disabled, select:disabled, button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Table Styling to match Reference */
+        th {
+            background-color: #1e1e1e;
+            color: #9e9e9e;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-bottom: 1px solid #333;
+            text-align: left;
+        }
+        td {
+            padding: 6px 12px;
+            border-bottom: 1px solid #333;
+            font-family: 'Consolas', monospace;
+            font-size: 0.8rem;
+        }
+        /* Color the first column Cyan (Name) and others Orange (Value) via JS or CSS nth-child */
+        td:first-child { color: #4fc3f7; } /* Name */
+        td:not(:first-child) { color: #ffb74d; } /* Value */
+
+        .d-none { display: none !important; }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col font-sans text-sm">
+
+    <!-- Header -->
+    <header class="h-10 bg-panel border-b border-border flex items-center justify-between px-3 shrink-0">
+        <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-good"></div>
+            <h1 class="font-semibold text-text-header tracking-wide text-sm">DB-OPC Playback</h1>
+        </div>
+        <div class="flex items-center">
+            <code id="opcEndpointDisplay" class="text-xs text-dim font-mono bg-[#181818] px-2 py-0.5 rounded border border-border">opc.tcp://localhost:4334/UA/PlaybackServer</code>
+        </div>
+    </header>
+
+    <!-- Workspace -->
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- Sidebar (Left) -->
+        <aside class="w-72 bg-panel border-r border-border flex flex-col shrink-0">
+            
+            <!-- Connection Panel -->
+            <div class="flex flex-col border-b border-border">
+                <div class="px-3 py-2 bg-header border-b border-border">
+                    <h3 class="text-xs font-bold text-dim uppercase tracking-wider">Connection</h3>
+                </div>
+                <div class="p-3 space-y-3">
+                    <form id="connForm" class="flex flex-col gap-3">
+                        <input type="text" id="dbHost" value="localhost" class="w-full" placeholder="Host">
+                        <div class="grid grid-cols-3 gap-2">
+                             <select id="dbType" class="col-span-2">
+                                <option value="pg">PostgreSQL</option>
+                                <option value="mysql2">MySQL</option>
+                                <option value="mssql">MSSQL</option>
+                            </select>
+                            <input type="number" id="dbPort" value="5432" placeholder="Port">
+                        </div>
+                        <input type="text" id="dbName" placeholder="Database" class="w-full">
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" id="dbUser" placeholder="User">
+                            <input type="password" id="dbPass" placeholder="Password">
+                        </div>
+                        
+                        <div class="flex items-center justify-between mt-1">
+                             <span id="connStatus" class="text-[10px] uppercase font-bold text-dim">Disconnected</span>
+                             <button type="submit" class="bg-bad hover:bg-red-600 text-white px-4 py-1.5 rounded-sm text-xs font-bold uppercase w-full ml-2">
+                                Connect
+                             </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Playback Settings (Mimicking Selection/Tree area) -->
+            <div class="flex-1 flex flex-col overflow-y-auto">
+                <div class="px-3 py-2 bg-header border-b border-border border-t border-border mt-auto"> <!-- Pushed down or distinct -->
+                    <h3 class="text-xs font-bold text-dim uppercase tracking-wider">Playback Control</h3>
+                </div>
+                <div class="p-3 space-y-3">
+                    
+                    <div>
+                        <label class="block text-[10px] text-dim uppercase font-bold mb-1">Timestamp Column</label>
+                        <select id="tsCol" class="w-full">
+                            <option selected disabled>-- Select --</option>
+                        </select>
+                    </div>
+
+                    <div>
+                         <label class="block text-[10px] text-dim uppercase font-bold mb-1">Unit</label>
+                         <select id="tsUnit" class="w-full">
+                            <option value="auto">Auto / ISO Date</option>
+                            <option value="ms">Milliseconds</option>
+                            <option value="s">Seconds</option>
+                            <option value="m">Minutes</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] text-dim uppercase font-bold mb-1">Mode</label>
+                        <select id="playMode" class="w-full">
+                            <option value="realtime">Realtime</option>
+                            <option value="multiplier">Multiplier</option>
+                            <option value="fixed">Fixed Interval</option>
+                        </select>
+                    </div>
+
+                    <!-- Dynamic Options -->
+                    <div id="modeOptions" class="p-2 bg-[#181818] border border-border rounded-sm hidden">
+                        <div id="multiplierInput" class="hidden">
+                            <label class="block text-[10px] text-dim mb-1">Speed (x)</label>
+                            <input type="number" id="valMultiplier" value="1.0" step="0.1" class="w-full">
+                        </div>
+                        <div id="intervalInput" class="hidden">
+                            <label class="block text-[10px] text-dim mb-1">Interval (ms)</label>
+                            <input type="number" id="valInterval" value="1000" class="w-full">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-2">
+                        <input type="checkbox" id="rbeCheck" checked class="accent-accent">
+                        <label for="rbeCheck" class="text-xs text-text-main cursor-pointer">Report by Exception</label>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 pt-2">
+                         <button id="startBtn" disabled class="bg-good hover:bg-green-500 text-white py-2 rounded-sm text-xs font-bold uppercase">Start</button>
+                         <button id="stopBtn" disabled class="bg-bad hover:bg-red-500 text-white py-2 rounded-sm text-xs font-bold uppercase">Stop</button>
+                    </div>
+
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content (Right) -->
+        <main class="flex-1 flex flex-col bg-app min-w-0">
+            
+            <!-- Top: Query -->
+            <div class="h-32 border-b border-border flex flex-col shrink-0">
+                 <div class="px-3 py-1 bg-header border-b border-border flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-dim uppercase tracking-wider">Query Definition</h3>
+                    <button id="runQueryBtn" disabled class="text-[10px] font-bold text-accent uppercase hover:text-white">Run Query</button>
+                </div>
+                <div class="flex-1 relative bg-panel">
+                    <textarea id="sqlQuery" class="absolute inset-0 w-full h-full bg-panel text-accent font-mono p-3 resize-none border-none focus:ring-0 text-xs leading-relaxed" 
+                    placeholder="SELECT * FROM table_name ORDER BY timestamp_col ASC"></textarea>
+                </div>
+            </div>
+
+            <!-- Middle: Data Table -->
+            <div class="flex-1 flex flex-col min-h-0 bg-app">
+                <div class="px-3 py-1 bg-header border-b border-border flex justify-between items-center shrink-0">
+                    <h3 class="text-xs font-bold text-dim uppercase tracking-wider">Real-Time Data</h3>
+                    <span id="rowCount" class="text-[10px] text-dim font-mono"></span>
+                </div>
+                <div id="queryResult" class="flex-1 overflow-auto p-0">
+                    <table id="previewTable" class="w-full text-left">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                    <div id="emptyState" class="h-full flex items-center justify-center text-dim text-xs opacity-30">
+                        No Data Available
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom: System Logs -->
+            <div class="h-32 bg-panel border-t border-border flex flex-col shrink-0">
+                <div class="px-3 py-1 bg-header border-b border-border flex justify-between items-center shrink-0">
+                    <h3 class="text-xs font-bold text-dim uppercase tracking-wider">System Logs</h3>
+                    <div class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse hidden" id="liveIndicator"></div>
+                </div>
+                <div id="liveLogs" class="flex-1 overflow-auto p-2 font-mono text-[11px] space-y-1 text-dim">
+                    <div>> System ready.</div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
