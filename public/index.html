@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DB-OPC Playback</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -17,11 +24,18 @@
                         border: '#333333',    // Subtle borders
                         input: '#2b2b2b',     // Input background
                         
-                        // Accents from image
+                        // Semantic Colors
+                        primary: '#007acc',   // Professional Blue (VS Code style)
+                        primaryHover: '#0062a3',
+                        
                         accent: '#4fc3f7',    // Cyan (Variables/Links)
                         value: '#ffb74d',     // Orange (Values)
-                        good: '#66bb6a',      // Green (Status Good)
-                        bad: '#ef5350',       // Red (Stop/Disconnect)
+                        
+                        good: '#388e3c',      // Muted Green (Success/Start)
+                        goodHover: '#2e7d32',
+                        
+                        bad: '#d32f2f',       // Muted Red (Danger/Stop)
+                        badHover: '#c62828',
                         
                         text: {
                             main: '#e0e0e0',
@@ -49,6 +63,13 @@
         
         body { background-color: #121212; color: #e0e0e0; }
 
+        /* CodeMirror Customization */
+        .CodeMirror {
+            height: 100% !important;
+            font-family: 'Consolas', 'Menlo', monospace;
+            font-size: 13px;
+        }
+
         /* Inputs */
         input, select, textarea {
             background-color: #2b2b2b !important;
@@ -59,7 +80,7 @@
             font-size: 0.8rem;
         }
         input:focus, select:focus, textarea:focus {
-            border-color: #4fc3f7 !important; /* Cyan focus */
+            border-color: #007acc !important; /* Primary focus */
             outline: none;
         }
         input:disabled, select:disabled, button:disabled {
@@ -108,7 +129,7 @@
     <div class="flex-1 flex overflow-hidden">
         
         <!-- Sidebar (Left) -->
-        <aside class="w-72 bg-panel border-r border-border flex flex-col shrink-0">
+        <aside id="sidebar" class="bg-panel border-r border-border flex flex-col shrink-0" style="width: 300px;">
             
             <!-- Connection Panel -->
             <div class="flex flex-col border-b border-border">
@@ -134,7 +155,7 @@
                         
                         <div class="flex items-center justify-between mt-1">
                              <span id="connStatus" class="text-[10px] uppercase font-bold text-dim">Disconnected</span>
-                             <button type="submit" class="bg-bad hover:bg-red-600 text-white px-4 py-1.5 rounded-sm text-xs font-bold uppercase w-full ml-2">
+                             <button type="submit" class="bg-primary hover:bg-primaryHover text-white px-4 py-1.5 rounded-sm text-xs font-bold uppercase w-full ml-2 shadow-sm transition-colors">
                                 Connect
                              </button>
                         </div>
@@ -147,77 +168,94 @@
                 <div class="px-3 py-2 bg-header border-b border-border border-t border-border mt-auto"> <!-- Pushed down or distinct -->
                     <h3 class="text-xs font-bold text-dim uppercase tracking-wider">Playback Control</h3>
                 </div>
-                <div class="p-3 space-y-3">
-                    
-                    <div>
-                        <label class="block text-[10px] text-dim uppercase font-bold mb-1">Timestamp Column</label>
-                        <select id="tsCol" class="w-full">
-                            <option selected disabled>-- Select --</option>
-                        </select>
-                    </div>
+                <div class="p-3 space-y-4">
+                    <fieldset id="playbackControls" disabled class="contents">
+                        
+                        <!-- Configuration Block -->
+                        <div class="space-y-3 p-1">
+                            <div>
+                                <label class="block text-[10px] text-dim uppercase font-bold mb-1">Mode</label>
+                                <select id="playMode" class="w-full border-l-2 border-l-primary">
+                                    <option value="realtime">Realtime</option>
+                                    <option value="multiplier">Multiplier</option>
+                                    <option value="fixed">Fixed Interval</option>
+                                </select>
+                            </div>
 
-                    <div>
-                         <label class="block text-[10px] text-dim uppercase font-bold mb-1">Unit</label>
-                         <select id="tsUnit" class="w-full">
-                            <option value="auto">Auto / ISO Date</option>
-                            <option value="ms">Milliseconds</option>
-                            <option value="s">Seconds</option>
-                            <option value="m">Minutes</option>
-                        </select>
-                    </div>
+                            <div>
+                                <label class="block text-[10px] text-dim uppercase font-bold mb-1">Timestamp Column</label>
+                                <select id="tsCol" class="w-full">
+                                    <option selected disabled>-- Select --</option>
+                                </select>
+                            </div>
 
-                    <div>
-                        <label class="block text-[10px] text-dim uppercase font-bold mb-1">Mode</label>
-                        <select id="playMode" class="w-full">
-                            <option value="realtime">Realtime</option>
-                            <option value="multiplier">Multiplier</option>
-                            <option value="fixed">Fixed Interval</option>
-                        </select>
-                    </div>
+                            <div>
+                                 <label class="block text-[10px] text-dim uppercase font-bold mb-1">Unit</label>
+                                 <select id="tsUnit" class="w-full">
+                                    <option value="auto">Auto / ISO Date</option>
+                                    <option value="ms">Milliseconds</option>
+                                    <option value="s">Seconds</option>
+                                    <option value="m">Minutes</option>
+                                </select>
+                            </div>
 
-                    <!-- Dynamic Options -->
-                    <div id="modeOptions" class="p-2 bg-[#181818] border border-border rounded-sm hidden">
-                        <div id="multiplierInput" class="hidden">
-                            <label class="block text-[10px] text-dim mb-1">Speed (x)</label>
-                            <input type="number" id="valMultiplier" value="1.0" step="0.1" class="w-full">
+                            <!-- Dynamic Options -->
+                            <div id="modeOptions" class="p-2 bg-[#181818] border border-border rounded-sm hidden">
+                                <div id="multiplierInput" class="hidden">
+                                    <label class="block text-[10px] text-dim mb-1">Speed (x)</label>
+                                    <input type="number" id="valMultiplier" value="1.0" step="0.1" class="w-full">
+                                </div>
+                                <div id="intervalInput" class="hidden">
+                                    <label class="block text-[10px] text-dim mb-1">Interval (ms)</label>
+                                    <input type="number" id="valInterval" value="1000" class="w-full">
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2 pt-1">
+                                <input type="checkbox" id="rbeCheck" checked class="accent-primary w-3.5 h-3.5">
+                                <label for="rbeCheck" class="text-xs text-text-main cursor-pointer select-none">Report by Exception</label>
+                            </div>
                         </div>
-                        <div id="intervalInput" class="hidden">
-                            <label class="block text-[10px] text-dim mb-1">Interval (ms)</label>
-                            <input type="number" id="valInterval" value="1000" class="w-full">
+
+                        <!-- Actions Block -->
+                        <div class="grid grid-cols-2 gap-3 pt-4 border-t border-border mt-2">
+                             <button id="startBtn" disabled class="bg-good hover:bg-goodHover text-white py-2 rounded-sm text-xs font-bold uppercase flex items-center justify-center gap-2 shadow-sm transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M4 4l12 6-12 6z"/></svg>
+                                Start
+                             </button>
+                             <button id="stopBtn" disabled class="bg-bad hover:bg-badHover text-white py-2 rounded-sm text-xs font-bold uppercase flex items-center justify-center gap-2 shadow-sm transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M6 6h8v8H6z"/></svg>
+                                Stop
+                             </button>
                         </div>
-                    </div>
-
-                    <div class="flex items-center gap-2 pt-2">
-                        <input type="checkbox" id="rbeCheck" checked class="accent-accent">
-                        <label for="rbeCheck" class="text-xs text-text-main cursor-pointer">Report by Exception</label>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-2 pt-2">
-                         <button id="startBtn" disabled class="bg-good hover:bg-green-500 text-white py-2 rounded-sm text-xs font-bold uppercase">Start</button>
-                         <button id="stopBtn" disabled class="bg-bad hover:bg-red-500 text-white py-2 rounded-sm text-xs font-bold uppercase">Stop</button>
-                    </div>
-
+                    </fieldset>
                 </div>
             </div>
         </aside>
+
+        <!-- Sidebar Resizer -->
+        <div id="resizer-sidebar" class="w-1 bg-border hover:bg-accent cursor-col-resize shrink-0 transition-colors"></div>
 
         <!-- Main Content (Right) -->
         <main class="flex-1 flex flex-col bg-app min-w-0">
             
             <!-- Top: Query -->
-            <div class="h-32 border-b border-border flex flex-col shrink-0">
-                 <div class="px-3 py-1 bg-header border-b border-border flex justify-between items-center">
+            <div id="queryPanel" class="flex-1 border-b border-border flex flex-col shrink-0 min-h-0">
+                 <div class="px-3 py-1 bg-header border-b border-border flex justify-between items-center shrink-0">
                     <h3 class="text-xs font-bold text-dim uppercase tracking-wider">Query Definition</h3>
-                    <button id="runQueryBtn" disabled class="text-[10px] font-bold text-accent uppercase hover:text-white">Run Query</button>
+                    <button id="runQueryBtn" disabled class="bg-primary hover:bg-primaryHover text-white px-4 py-1.5 rounded-sm text-xs font-bold uppercase shadow-sm transition-colors" title="Runs query and fetches first 10 rows to detect schema">Run Query</button>
                 </div>
-                <div class="flex-1 relative bg-panel">
+                <div class="flex-1 relative bg-panel overflow-hidden">
                     <textarea id="sqlQuery" class="absolute inset-0 w-full h-full bg-panel text-accent font-mono p-3 resize-none border-none focus:ring-0 text-xs leading-relaxed" 
                     placeholder="SELECT * FROM table_name ORDER BY timestamp_col ASC"></textarea>
                 </div>
             </div>
 
+            <!-- Query Resizer -->
+            <div id="resizer-query" class="h-1 bg-border hover:bg-accent cursor-row-resize shrink-0 transition-colors"></div>
+
             <!-- Middle: Data Table -->
-            <div class="flex-1 flex flex-col min-h-0 bg-app">
+            <div id="tablePanel" class="h-80 flex flex-col shrink-0 bg-app">
                 <div class="px-3 py-1 bg-header border-b border-border flex justify-between items-center shrink-0">
                     <h3 class="text-xs font-bold text-dim uppercase tracking-wider">Real-Time Data</h3>
                     <span id="rowCount" class="text-[10px] text-dim font-mono"></span>
@@ -233,8 +271,11 @@
                 </div>
             </div>
 
+            <!-- Logs Resizer -->
+            <div id="resizer-logs" class="h-1 bg-border hover:bg-accent cursor-row-resize shrink-0 transition-colors"></div>
+
             <!-- Bottom: System Logs -->
-            <div class="h-32 bg-panel border-t border-border flex flex-col shrink-0">
+            <div id="logsPanel" class="bg-panel border-t border-border flex flex-col shrink-0" style="height: 150px;">
                 <div class="px-3 py-1 bg-header border-b border-border flex justify-between items-center shrink-0">
                     <h3 class="text-xs font-bold text-dim uppercase tracking-wider">System Logs</h3>
                     <div class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse hidden" id="liveIndicator"></div>

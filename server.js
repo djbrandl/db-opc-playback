@@ -226,5 +226,11 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    const url = `http://localhost:${PORT}`;
+    console.log(`Server running on ${url}`);
+
+    // Automatically open browser
+    const { exec } = require('child_process');
+    const start = process.platform == 'darwin' ? 'open' : process.platform == 'win32' ? 'start' : 'xdg-open';
+    exec(`${start} ${url}`);
 });

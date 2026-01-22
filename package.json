@@ -21,5 +21,8 @@
     "pg": "^8.17.2",
     "pg-query-stream": "^4.11.2",
     "socket.io": "^4.8.3"
+  },
+  "overrides": {
+    "lodash": "^4.17.23"
   }
 }

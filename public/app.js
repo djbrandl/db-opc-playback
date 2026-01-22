@@ -20,6 +20,108 @@ const stopBtn = document.getElementById('stopBtn');
 const liveLogs = document.getElementById('liveLogs');
 const liveIndicator = document.getElementById('liveIndicator');
 const opcEndpointDisplay = document.getElementById('opcEndpointDisplay');
+const tsUnit = document.getElementById('tsUnit');
+const playbackControls = document.getElementById('playbackControls');
+
+// Resizable Elements
+const sidebar = document.getElementById('sidebar');
+const resizerSidebar = document.getElementById('resizer-sidebar');
+const logsPanel = document.getElementById('logsPanel');
+const resizerLogs = document.getElementById('resizer-logs');
+const tablePanel = document.getElementById('tablePanel');
+const resizerQuery = document.getElementById('resizer-query');
+
+// Initialize CodeMirror
+const editor = CodeMirror.fromTextArea(sqlQuery, {
+    mode: 'text/x-sql',
+    theme: 'dracula',
+    lineNumbers: true,
+    tabSize: 4,
+    indentWithTabs: false,
+    smartIndent: true,
+    lineWrapping: true,
+    matchBrackets: true
+});
+
+// Resizing Logic
+function initResizers() {
+    // Sidebar Resizer (Width)
+    let isResizingSidebar = false;
+    
+    resizerSidebar.addEventListener('mousedown', (e) => {
+        isResizingSidebar = true;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none'; // Prevent text selection
+    });
+
+    // Logs Resizer (Height) - Bottom Panel
+    let isResizingLogs = false;
+
+    resizerLogs.addEventListener('mousedown', (e) => {
+        isResizingLogs = true;
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+    });
+
+    // Query/Table Resizer (Height) - Middle Split
+    // Dragging this resizer adjusts the Table Panel (bottom of the split)
+    let isResizingQuery = false;
+    let startY, startHeight;
+
+    resizerQuery.addEventListener('mousedown', (e) => {
+        isResizingQuery = true;
+        startY = e.clientY;
+        startHeight = parseInt(document.defaultView.getComputedStyle(tablePanel).height, 10);
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (isResizingSidebar) {
+            const newWidth = e.clientX; 
+            if (newWidth > 150 && newWidth < 600) { 
+                sidebar.style.width = `${newWidth}px`;
+            }
+        }
+
+        if (isResizingLogs) {
+            // Height = Total Window Height - Mouse Y
+            const newHeight = window.innerHeight - e.clientY;
+            if (newHeight > 50 && newHeight < 600) {
+                logsPanel.style.height = `${newHeight}px`;
+            }
+        }
+
+        if (isResizingQuery) {
+            // Dragging UP (negative delta) -> Increases Table Height (Panel is below resizer)
+            // Dragging DOWN (positive delta) -> Decreases Table Height
+            const delta = e.clientY - startY;
+            const newHeight = startHeight - delta;
+            
+            if (newHeight > 100 && newHeight < 800) {
+                tablePanel.style.height = `${newHeight}px`;
+            }
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizingSidebar || isResizingLogs || isResizingQuery) {
+            isResizingSidebar = false;
+            isResizingLogs = false;
+            isResizingQuery = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            
+            // Refresh editor to adapt to new size if needed
+            editor.refresh();
+        }
+    });
+}
+
+initResizers();
+
+// Fix for CodeMirror rendering if initialized in a hidden container or similar (good practice)
+setTimeout(() => editor.refresh(), 100);
 
 let availableColumns = [];
 
@@ -59,7 +161,7 @@ connForm.addEventListener('submit', (e) => {
 
 // Run Query
 runQueryBtn.addEventListener('click', () => {
-    const query = sqlQuery.value;
+    const query = editor.getValue();
     if (!query.trim()) return;
 
     runQueryBtn.disabled = true;
@@ -75,7 +177,6 @@ runQueryBtn.addEventListener('click', () => {
             // Render Preview
             renderPreview(res.columns, res.preview);
             rowCount.textContent = `${res.totalRows} rows`;
-            // queryResult is always visible in new design, but we populate it
             
             // Populate Timestamp Dropdown
             availableColumns = res.columns;
@@ -87,6 +188,8 @@ runQueryBtn.addEventListener('click', () => {
                 tsCol.appendChild(opt);
             });
             
+            // Enable Playback Controls
+            playbackControls.disabled = false;
             checkStartReady();
         } else {
             alert('Query Error: ' + res.message);
@@ -133,41 +236,75 @@ function renderPreview(columns, rows) {
 // Mode Selection UI
 playMode.addEventListener('change', () => {
     const mode = playMode.value;
-    const modeHint = document.getElementById('modeHint');
     
-    // Reset
+    // Reset inputs
     multiplierInput.classList.add('hidden');
     intervalInput.classList.add('hidden');
-    modeHint.classList.add('hidden');
+    modeOptions.classList.add('hidden');
+
+    // Default: Enable Timestamp options
+    tsCol.disabled = false;
+    tsUnit.disabled = false;
 
     if (mode === 'multiplier') {
+        modeOptions.classList.remove('hidden');
         multiplierInput.classList.remove('hidden');
     } else if (mode === 'fixed') {
+        modeOptions.classList.remove('hidden');
         intervalInput.classList.remove('hidden');
-    } else if (mode === 'realtime') {
-        modeHint.textContent = "Replays data using original timestamp deltas.";
-        modeHint.classList.remove('hidden');
-    }
+        // Fixed Mode: Disable Timestamp options as they aren't used
+        tsCol.disabled = true;
+        tsUnit.disabled = true;
+        tsCol.value = "Select Column..."; // Reset selection visuals if desired
+    } 
+    
     checkStartReady();
 });
 
 tsCol.addEventListener('change', checkStartReady);
+valMultiplier.addEventListener('input', checkStartReady);
+valInterval.addEventListener('input', checkStartReady);
 
 function checkStartReady() {
+    // If controls are disabled (query not run), start is disabled
+    if (playbackControls.disabled) {
+        startBtn.disabled = true;
+        return;
+    }
+
     const hasCols = availableColumns.length > 0;
     const tsSelected = tsCol.value && tsCol.value !== 'Select Column...';
+    const mode = playMode.value;
     
-    if (hasCols && tsSelected) {
-        startBtn.disabled = false;
+    let isValid = false;
+
+    if (mode === 'fixed') {
+        // Fixed: Needs valid interval > 0
+        const interval = parseInt(valInterval.value);
+        isValid = hasCols && !isNaN(interval) && interval > 0;
     } else {
-        startBtn.disabled = true;
+        // Realtime/Multiplier: Needs Timestamp Column
+        if (mode === 'multiplier') {
+             const mult = parseFloat(valMultiplier.value);
+             isValid = hasCols && tsSelected && !isNaN(mult) && mult > 0;
+        } else {
+            // Realtime
+             isValid = hasCols && tsSelected;
+        }
     }
+
+    startBtn.disabled = !isValid;
 }
 
 // Playback Control
 startBtn.addEventListener('click', () => {
+    let tsColumn = tsCol.value;
+    if (tsColumn === 'Select Column...') {
+        tsColumn = null;
+    }
+
     const config = {
-        timestampCol: tsCol.value,
+        timestampCol: tsColumn,
         timestampUnit: document.getElementById('tsUnit').value,
         mode: playMode.value,
         multiplier: valMultiplier.value,
