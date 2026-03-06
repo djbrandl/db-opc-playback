@@ -11,6 +11,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "aedes": "^1.0.0",
     "body-parser": "^2.2.2",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
@@ -20,7 +21,8 @@
     "node-opcua": "^2.161.0",
     "pg": "^8.17.2",
     "pg-query-stream": "^4.11.2",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "sparkplug-payload": "^1.0.3"
   },
   "overrides": {
     "lodash": "^4.17.23"

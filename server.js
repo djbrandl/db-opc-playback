@@ -11,6 +11,7 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 const OPC_PORT = parseInt(process.env.OPC_PORT) || 4334;
+const MQTT_PORT = parseInt(process.env.MQTT_PORT) || 1883;
 
 // Middleware
 app.use(bodyParser.json());
@@ -19,6 +20,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Managers
 const dbManager = require('./managers/dbManager');
 const opcManager = require('./managers/opcManager');
+const mqttManager = require('./managers/mqttManager');
 const playbackEngine = require('./managers/playbackEngine');
 
 // Global State
@@ -32,13 +34,17 @@ let appState = {
 // Initialize OPC Server on startup (or lazy load)
 opcManager.startServer(OPC_PORT).catch(console.error);
 
+// Initialize MQTT Broker on startup
+mqttManager.startBroker(MQTT_PORT).catch(console.error);
+
 io.on('connection', (socket) => {
     console.log('Client connected');
     
     // Send configuration to client
-    socket.emit('server-info', { 
+    socket.emit('server-info', {
         opcPort: OPC_PORT,
-        opcEndpoint: `opc.tcp://localhost:${OPC_PORT}/UA/PlaybackServer`
+        opcEndpoint: `opc.tcp://localhost:${OPC_PORT}/UA/PlaybackServer`,
+        mqttPort: MQTT_PORT
     });
 
     socket.on('disconnect', () => {
@@ -135,6 +141,20 @@ io.on('connection', (socket) => {
             return;
         }
 
+        // Configure MQTT/SparkplugB
+        mqttManager.configure({
+            groupId: config.groupId || 'Playback',
+            edgeNodeId: config.edgeNodeId || 'PlaybackNode',
+            deviceId: config.deviceId || 'PlaybackDevice',
+            publishSparkplug: config.publishSparkplug !== false,
+            publishPlainMqtt: config.publishPlainMqtt !== false,
+            plainMqttBaseTopic: config.plainMqttBaseTopic || ''
+        });
+        mqttManager.setupMetricsFromData(appState.previewRow);
+        if (config.publishSparkplug !== false) {
+            mqttManager.publishBirth();
+        }
+
         // Start Stream
         try {
             const stream = dbManager.getStream(appState.lastQuery);
@@ -146,6 +166,7 @@ io.on('connection', (socket) => {
             // Bind events
             playbackEngine.on('row', (row) => {
                 opcManager.updateTags(row, config.rbe);
+                mqttManager.updateMetrics(row, config.rbe);
                 
                 // Handle UI RBE
                 if (config.rbe) {

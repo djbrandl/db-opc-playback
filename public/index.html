@@ -120,8 +120,9 @@
             <div class="w-2 h-2 rounded-full bg-good"></div>
             <h1 class="font-semibold text-text-header tracking-wide text-sm">DB-OPC Playback</h1>
         </div>
-        <div class="flex items-center">
+        <div class="flex items-center gap-3">
             <code id="opcEndpointDisplay" class="text-xs text-dim font-mono bg-[#181818] px-2 py-0.5 rounded border border-border">opc.tcp://localhost:4334/UA/PlaybackServer</code>
+            <code id="mqttEndpointDisplay" class="text-xs text-dim font-mono bg-[#181818] px-2 py-0.5 rounded border border-border">mqtt://localhost:1883</code>
         </div>
     </header>
 
@@ -163,14 +164,14 @@
                 </div>
             </div>
 
-            <!-- Playback Settings (Mimicking Selection/Tree area) -->
+            <!-- Playback Settings -->
             <div class="flex-1 flex flex-col overflow-y-auto">
-                <div class="px-3 py-2 bg-header border-b border-border border-t border-border mt-auto"> <!-- Pushed down or distinct -->
+                <div class="px-3 py-2 bg-header border-b border-border border-t border-border mt-auto">
                     <h3 class="text-xs font-bold text-dim uppercase tracking-wider">Playback Control</h3>
                 </div>
                 <div class="p-3 space-y-4">
                     <fieldset id="playbackControls" disabled class="contents">
-                        
+
                         <!-- Configuration Block -->
                         <div class="space-y-3 p-1">
                             <div>
@@ -214,6 +215,53 @@
                             <div class="flex items-center gap-2 pt-1">
                                 <input type="checkbox" id="rbeCheck" checked class="accent-primary w-3.5 h-3.5">
                                 <label for="rbeCheck" class="text-xs text-text-main cursor-pointer select-none">Report by Exception</label>
+                            </div>
+                        </div>
+
+                        <!-- Protocol Tabs -->
+                        <div class="border-t border-border mt-2 pt-3">
+                            <div class="flex border-b border-border mb-3">
+                                <button type="button" id="tabOpcUa" class="protocol-tab px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-primary border-b-2 border-primary">OPC UA</button>
+                                <button type="button" id="tabMqtt" class="protocol-tab px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-dim border-b-2 border-transparent hover:text-text-main">MQTT / SparkplugB</button>
+                            </div>
+
+                            <!-- OPC UA Tab Content -->
+                            <div id="tabContentOpcUa" class="protocol-tab-content space-y-2 p-1">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-1.5 h-1.5 rounded-full bg-good"></div>
+                                    <span class="text-[10px] text-dim uppercase">Always Active</span>
+                                </div>
+                                <div class="text-[10px] text-dim">
+                                    OPC UA tags are automatically created from query columns. Connect any OPC UA client to the endpoint shown in the header.
+                                </div>
+                            </div>
+
+                            <!-- MQTT Tab Content -->
+                            <div id="tabContentMqtt" class="protocol-tab-content space-y-3 p-1 hidden">
+                                <div>
+                                    <label class="block text-[10px] text-dim uppercase font-bold mb-1">Group ID</label>
+                                    <input type="text" id="mqttGroupId" value="Playback" class="w-full" placeholder="Playback">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] text-dim uppercase font-bold mb-1">Edge Node ID</label>
+                                    <input type="text" id="mqttEdgeNodeId" value="PlaybackNode" class="w-full" placeholder="PlaybackNode">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] text-dim uppercase font-bold mb-1">Device ID</label>
+                                    <input type="text" id="mqttDeviceId" value="PlaybackDevice" class="w-full" placeholder="PlaybackDevice">
+                                </div>
+                                <div class="flex items-center gap-2 pt-1">
+                                    <input type="checkbox" id="mqttSparkplug" checked class="accent-primary w-3.5 h-3.5">
+                                    <label for="mqttSparkplug" class="text-xs text-text-main cursor-pointer select-none">Publish SparkplugB</label>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" id="mqttPlain" checked class="accent-primary w-3.5 h-3.5">
+                                    <label for="mqttPlain" class="text-xs text-text-main cursor-pointer select-none">Publish Plain MQTT</label>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] text-dim uppercase font-bold mb-1">Plain MQTT Base Topic</label>
+                                    <input type="text" id="mqttBaseTopic" value="" class="w-full" placeholder="{groupId}/{edgeNodeId}/{deviceId}">
+                                </div>
                             </div>
                         </div>
 

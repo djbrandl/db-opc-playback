@@ -20,6 +20,7 @@ const stopBtn = document.getElementById('stopBtn');
 const liveLogs = document.getElementById('liveLogs');
 const liveIndicator = document.getElementById('liveIndicator');
 const opcEndpointDisplay = document.getElementById('opcEndpointDisplay');
+const mqttEndpointDisplay = document.getElementById('mqttEndpointDisplay');
 const tsUnit = document.getElementById('tsUnit');
 const playbackControls = document.getElementById('playbackControls');
 
@@ -120,6 +121,30 @@ function initResizers() {
 
 initResizers();
 
+// Protocol Tab Switching
+(function initProtocolTabs() {
+    const tabs = document.querySelectorAll('.protocol-tab');
+    const contents = document.querySelectorAll('.protocol-tab-content');
+
+    tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+            // Deactivate all
+            tabs.forEach((t) => {
+                t.classList.remove('text-primary', 'border-primary');
+                t.classList.add('text-dim', 'border-transparent');
+            });
+            contents.forEach((c) => c.classList.add('hidden'));
+
+            // Activate clicked
+            tab.classList.remove('text-dim', 'border-transparent');
+            tab.classList.add('text-primary', 'border-primary');
+
+            const targetId = tab.id === 'tabOpcUa' ? 'tabContentOpcUa' : 'tabContentMqtt';
+            document.getElementById(targetId).classList.remove('hidden');
+        });
+    });
+})();
+
 // Fix for CodeMirror rendering if initialized in a hidden container or similar (good practice)
 setTimeout(() => editor.refresh(), 100);
 
@@ -128,6 +153,9 @@ let availableColumns = [];
 socket.on('server-info', (info) => {
     if (opcEndpointDisplay && info.opcEndpoint) {
         opcEndpointDisplay.textContent = info.opcEndpoint;
+    }
+    if (mqttEndpointDisplay && info.mqttPort) {
+        mqttEndpointDisplay.textContent = `mqtt://localhost:${info.mqttPort}`;
     }
 });
 
@@ -309,7 +337,14 @@ startBtn.addEventListener('click', () => {
         mode: playMode.value,
         multiplier: valMultiplier.value,
         interval: valInterval.value,
-        rbe: document.getElementById('rbeCheck').checked
+        rbe: document.getElementById('rbeCheck').checked,
+        // MQTT / SparkplugB config
+        groupId: document.getElementById('mqttGroupId').value,
+        edgeNodeId: document.getElementById('mqttEdgeNodeId').value,
+        deviceId: document.getElementById('mqttDeviceId').value,
+        publishSparkplug: document.getElementById('mqttSparkplug').checked,
+        publishPlainMqtt: document.getElementById('mqttPlain').checked,
+        plainMqttBaseTopic: document.getElementById('mqttBaseTopic').value
     };
     
     socket.emit('start-playback', config);
@@ -357,14 +392,25 @@ socket.on('error', (msg) => {
 function addLog(source, msg, colorClass = 'text-gray-400') {
     const div = document.createElement('div');
     div.className = "border-l-2 border-[#3e3e42] pl-2 py-1";
-    
+
     const time = new Date().toLocaleTimeString();
-    div.innerHTML = `
-        <span class="text-[10px] text-[#565656] mr-2">${time}</span>
-        <span class="text-[10px] font-bold uppercase tracking-wider ${colorClass} mr-2">${source}</span>
-        <span class="text-gray-400">${msg}</span>
-    `;
-    
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = "text-[10px] text-[#565656] mr-2";
+    timeSpan.textContent = time;
+
+    const sourceSpan = document.createElement('span');
+    sourceSpan.className = `text-[10px] font-bold uppercase tracking-wider ${colorClass} mr-2`;
+    sourceSpan.textContent = source;
+
+    const msgSpan = document.createElement('span');
+    msgSpan.className = "text-gray-400";
+    msgSpan.textContent = msg;
+
+    div.appendChild(timeSpan);
+    div.appendChild(sourceSpan);
+    div.appendChild(msgSpan);
+
     liveLogs.appendChild(div);
     liveLogs.scrollTop = liveLogs.scrollHeight;
 }
